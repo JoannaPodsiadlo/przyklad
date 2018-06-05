@@ -1,0 +1,52 @@
+---
+title: "R Notebook"
+author: "Joanna PodsiadĹ‚o"
+output:
+  html_document:
+    df_print: paged
+---
+
+Analiza iczby ofert na jednego mieszkańca
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+#potrzebne pakiety
+require(magrittr)
+require(dplyr)
+require(rvest)
+require(stringi)
+#do opcjonalych bibliotek nie ma error tylko warning
+```
+Dalej wczytujemy dane
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+otodom <- read.csv(file = "../data/otodom_cleaned_ver2.csv", stringsAsFactors = FALSE)
+otodom = tbl_df(otodom)
+
+statystyki_miast <- 
+    html_session("https://pl.wikipedia.org/wiki/Miasta_w_Polsce_(statystyki)") %>%
+    html_node("table") %>%
+    html_table(trim = TRUE) %>%
+    set_colnames(c("miasto", "powiat", "wojewodztwo", "pow", "ludnosc", "gestosc")) %>%
+    mutate(pow = as.numeric(stri_replace_all_fixed(pow, ",", ".")),
+           ludnosc = as.numeric(stri_replace_all_regex(ludnosc, "[:space:]", "")))
+```
+
+Zmienna statystki miast `r nrow(statystyki_miast)` wierszy. Table poniżej
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+oferty <- otodom %>%
+    group_by(adres_miasto, adres_wojewodztwo) %>%
+    summarise(ile_ofert = n())
+
+oferty %<>% left_join(statystyki_miast, by=c("adres_miasto" = "miasto",
+                                             adres_wojewodztwo = "wojewodztwo")) %>%
+    filter(!is.na(powiat))
+
+oferty %>% 
+    mutate(ofert_na_mieszkanca = ile_ofert / ludnosc) %>%
+    arrange(desc(ofert_na_mieszkanca))
+
+```
+Otzrymujemy 
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+oferty
+```
+I wykres
